@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>College Attendance Tracker</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1f2430; --muted: #6b7280; --border: #e2e5ea;
+    --primary: #2563eb; --primary-text: #fff;
+    --present: #16a34a; --late: #d97706; --absent: #dc2626; --excused: #6b7280; --danger: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1d2128; --text: #e8eaee; --muted: #9aa3b2; --border: #2d333d; --primary: #3b82f6; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { padding: 14px 16px; max-width: 900px; margin: 0 auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 19px; margin: 0; flex: 1; min-width: 160px; }
+  main { max-width: 900px; margin: 0 auto; padding: 0 16px 48px; }
+  nav { display: flex; gap: 6px; margin-bottom: 14px; }
+  nav button { flex: 1; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button:hover { border-color: var(--primary); }
+  button.primary, nav button.active { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+  button.danger { color: var(--danger); }
+  input, select, textarea { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  textarea { width: 100%; min-height: 110px; resize: vertical; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .card h2 { font-size: 16px; margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row > .grow { flex: 1; min-width: 140px; }
+  .stack { display: flex; flex-direction: column; gap: 10px; max-width: 380px; margin: 0 auto; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .item { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .item:last-child { border-bottom: 0; }
+  .item .name { font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 6px 10px; font-size: 13px; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on[data-s="present"] { background: var(--present); color: #fff; }
+  .seg button.on[data-s="late"] { background: var(--late); color: #fff; }
+  .seg button.on[data-s="absent"] { background: var(--absent); color: #fff; }
+  .seg button.on[data-s="excused"] { background: var(--excused); color: #fff; }
+  .periods { display: flex; width: 100%; }
+  .periods button { flex: 1; padding: 8px 2px; }
+  .periods button.on { background: var(--primary); color: #fff; }
+  .periods button.has::after { content: ' \25CF'; font-size: 9px; color: var(--present); }
+  .periods button.on.has::after { color: #fff; }
+  .periods button.locked::after { content: ' \1F512'; font-size: 10px; color: inherit; }
+  .lockbar { align-items: center; min-height: 34px; }
+  td.cell { text-align: center; font-weight: 700; }
+  td.cell.present { color: var(--present); } td.cell.late { color: var(--late); } td.cell.absent { color: var(--absent); } td.cell.excused { color: var(--excused); }
+  td.cell.none { color: var(--muted); font-weight: 400; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; }
+  .table-wrap { overflow-x: auto; }
+  .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; min-width: 60px; }
+  .bar > i { display: block; height: 100%; background: var(--present); }
+  tr.low .bar > i { background: var(--absent); }
+  tr.low b { color: var(--absent); }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; z-index: 10; }
+  .toast.show { opacity: 1; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .warn { background: #fef3c7; color: #92400e; border-radius: 8px; padding: 8px 12px; margin: 0 0 14px; display: none; }
+  .teacher-btn { display: block; width: 100%; text-align: left; margin-bottom: 8px; padding: 12px; font-weight: 600; }
+  details summary { cursor: pointer; font-weight: 600; }
+  @media print {
+    header, nav, .noprint, .toast, .warn { display: none !important; }
+    body { background: #fff; color: #000; }
+    .card { border: 0; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">College Attendance Tracker</h1>
+  <select id="secSel" aria-label="Section" hidden></select>
+  <span class="muted" id="who" hidden></span>
+  <button id="logout" hidden>Log out</button>
+</header>
+<main>
+  <div class="warn" id="warn" role="alert"></div>
+  <div class="empty" id="loading">Loading&hellip;</div>
+
+  <!-- Cannot reach the server -->
+  <section id="offline" hidden>
+    <div class="card empty">Cannot reach the server. Check your internet connection.<br><br>
+      <button id="retryConn" class="primary">Try again</button></div>
+  </section>
+
+  <!-- Cloud login / first-time setup -->
+  <section id="cloudLogin" hidden>
+    <form class="card stack" id="cloudForm">
+      <h2 id="cTitle" style="text-align:center">Log in</h2>
+      <input id="cUser" placeholder="Username or email" maxlength="60" autocomplete="username" autocapitalize="none" required>
+      <input id="cPass" type="password" placeholder="Password" maxlength="200" autocomplete="current-password" required>
+      <div id="setupExtra" class="stack" style="max-width:none;margin:0" hidden>
+        <input id="cName" placeholder="Your full name" maxlength="60" autocomplete="name">
+        <select id="cMode" aria-label="Sign-up type" hidden>
+          <option value="new">Create my own account (no code needed)</option>
+          <option value="join">I have a college code from my administrator</option>
+        </select>
+        <input id="cCode" placeholder="College code" maxlength="20" autocapitalize="characters" autocomplete="off" hidden>
+        <input id="cCollege" placeholder="College / school name (optional)" maxlength="80" autocomplete="organization">
+        <div class="muted" id="setupNote"></div>
+      </div>
+      <button class="primary" type="submit" id="cSubmit">Log in</button>
+      <button type="button" id="toggleReg" style="border:0;background:none;color:var(--primary)">New here? Create an account</button>
+    </form>
+  </section>
+
+  <!-- Local (browser-only) teacher picker -->
+  <section id="login" hidden>
+    <div class="card" id="teacherList"></div>
+    <form class="card" id="signupForm">
+      <h2>Add a teacher</h2>
+      <div class="row">
+        <input id="tName" class="grow" placeholder="Teacher name" maxlength="60" required autocomplete="off">
+        <input id="tPin" class="grow" type="password" placeholder="PIN (optional, 4+ chars)" maxlength="40" autocomplete="new-password">
+        <button class="primary" type="submit">Create</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <nav id="tabs">
+      <button data-tab="mark" class="active">Mark</button>
+      <button data-tab="students">Students</button>
+      <button data-tab="reports">Reports</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+
+    <section id="tab-mark">
+      <div class="card">
+        <div class="row">
+          <button id="prevDay" aria-label="Previous day">&larr;</button>
+          <input type="date" id="markDate" class="grow">
+          <button id="nextDay" aria-label="Next day">&rarr;</button>
+          <button id="today">Today</button>
+        </div>
+        <div class="seg periods" id="periodBar" style="margin-top:10px" role="group" aria-label="Period"></div>
+        <div class="row lockbar" id="lockBar" style="margin-top:10px"></div>
+        <div class="row" style="margin-top:10px">
+          <input id="subject" class="grow" list="subjectList" placeholder="Subject for this period (optional)" maxlength="36" autocomplete="off">
+          <datalist id="subjectList"></datalist>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="allPresent">Mark all present</button>
+          <button id="clearDay" class="danger">Clear this session</button>
+          <span class="muted" id="markSummary"></span>
+        </div>
+      </div>
+      <div class="card" id="markList"></div>
+    </section>
+
+    <section id="tab-students" hidden>
+      <form class="card row" id="addStudent">
+        <input id="sRoll" placeholder="Roll / Reg. no." maxlength="20" style="width:140px" autocomplete="off">
+        <input id="sName" class="grow" placeholder="Student name" maxlength="80" required autocomplete="off">
+        <button class="primary" type="submit">Add</button>
+      </form>
+      <details class="card">
+        <summary>Add many students at once</summary>
+        <p class="muted">One student per line: <code>roll, name</code> (or just the name). You can paste straight from Excel.</p>
+        <textarea id="bulkText" placeholder="101, Asha Verma&#10;102, Rahul Das"></textarea>
+        <div class="row" style="margin-top:8px"><button id="bulkAdd" class="primary" type="button">Add these students</button></div>
+      </details>
+      <div class="card" id="studentList"></div>
+    </section>
+
+    <section id="tab-reports" hidden>
+      <div class="card">
+        <div class="row">
+          <label class="muted">From <input type="date" id="from"></label>
+          <label class="muted">To <input type="date" id="to"></label>
+          <select id="perFilter" aria-label="Period"></select>
+          <button id="exportCsv">Export CSV</button>
+          <button id="printBtn">Print</button>
+        </div>
+      </div>
+      <div class="card"><div class="table-wrap" id="reportTable"></div></div>
+      <div class="card">
+        <h2>Day register (all 8 periods)</h2>
+        <div class="row" style="margin-bottom:8px"><input type="date" id="regDate"> <span class="muted">P present, L late, A absent, E excused, &middot; not taken</span></div>
+        <div class="table-wrap" id="regTable"></div>
+      </div>
+    </section>
+
+    <section id="tab-settings" hidden>
+      <div class="card">
+        <h2>Sections</h2>
+        <p class="muted">Your sections, students and attendance are private to your account. No other teacher or admin can see them.</p>
+        <div class="row" style="margin-bottom:10px">
+          <button id="addFirstYear">Add all 1st-year sections (A1&ndash;A10, B1&ndash;B10)</button>
+        </div>
+        <form class="row" id="addSection">
+          <select id="secYear" aria-label="Year">
+            <option value="1">1st Year</option><option value="2">2nd Year</option>
+            <option value="3">3rd Year</option><option value="4">4th Year</option>
+          </select>
+          <input id="secName" class="grow" list="secNames" placeholder="Section (e.g. A1)" maxlength="40" required autocomplete="off">
+          <datalist id="secNames"></datalist>
+          <button class="primary" type="submit">Add section</button>
+        </form>
+        <div id="sectionList"></div>
+      </div>
+
+      <div class="card" id="orgCard" hidden>
+        <h2>Your college</h2>
+        <div class="row"><input id="orgName" class="grow" maxlength="80" aria-label="College name"><button type="button" id="orgSave">Save name</button></div>
+        <p style="margin:12px 0 4px">College code for your teachers: <b id="orgCode" style="font-size:18px;letter-spacing:.12em"></b></p>
+        <div class="row"><button type="button" id="orgCopy">Copy code</button><button type="button" id="orgNew">Make a new code</button></div>
+        <p class="muted" style="margin-bottom:0">Teachers open the site, tap "Create an account", choose "My college already uses this" and enter this code. Each teacher's sections, students and attendance are private to their own account: nobody else, not even you as admin, can see them.</p>
+      </div>
+
+      <!-- cloud: accounts -->
+      <div class="card" id="usersCard" hidden>
+        <h2>Teacher accounts</h2>
+        <label class="row muted" style="margin-bottom:8px"><input type="checkbox" id="reqApproval"> Require my approval before new sign-ups can log in</label>
+        <div id="userList"></div>
+        <form class="row" id="addUser" style="margin-top:10px">
+          <input id="uUser" class="grow" placeholder="Username or email" maxlength="60" autocapitalize="none" autocomplete="off" required>
+          <input id="uName" class="grow" placeholder="Full name" maxlength="60" autocomplete="off">
+          <input id="uPass" class="grow" type="password" placeholder="Temporary password (8+)" maxlength="200" autocomplete="new-password" required>
+          <select id="uRole" aria-label="Role"><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
+          <button class="primary" type="submit">Add account</button>
+        </form>
+        
+        <form class="row" id="resetUser" style="margin-top:10px">
+          <select id="rUser" class="grow" aria-label="User"></select>
+          <input id="rPass" class="grow" type="password" placeholder="New password (8+)" maxlength="200" autocomplete="new-password" required>
+          <button type="submit">Reset password</button>
+        </form>
+      </div>
+      <div class="card" id="myAccount" hidden>
+        <h2>My account</h2>
+        <form class="row" id="pwForm">
+          <input id="pwCur" class="grow" type="password" placeholder="Current password" maxlength="200" autocomplete="current-password" required>
+          <input id="pwNew" class="grow" type="password" placeholder="New password (8+)" maxlength="200" autocomplete="new-password" required>
+          <button type="submit">Change password</button>
+        </form>
+        <div class="row" style="margin-top:12px"><button type="button" id="backupCloud">Download my backup</button>
+          <span class="muted">Saves all your sections, students and attendance to a file on this device.</span></div>
+        <p class="muted" style="margin-bottom:0">Your sections, students and attendance are stored securely online and are private to your account: nobody else can see them.</p>
+      </div>
+
+      <!-- local mode: backup & PIN -->
+      <div class="card" id="localAccount">
+        <h2>Backup &amp; account</h2>
+        <div class="row">
+          <button id="backup">Download full backup</button>
+          <button id="restoreBtn">Restore backup</button>
+          <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+          <button id="changePin">Change / set my PIN</button>
+          <button id="deleteMe" class="danger">Delete my login</button>
+        </div>
+        <p class="muted" style="margin-bottom:0">Saved in this browser only (not shared between devices). Download a backup regularly.</p>
+      </div>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'collegeAttendance.v3', OLD_KEY = 'teacherAttendanceTracker.v2';
+  var STATUSES = ['present', 'late', 'absent', 'excused'];
+  var LABELS = { present: 'Present', late: 'Late', absent: 'Absent', excused: 'Excused' };
+  var LOW = 75; // attendance % below this is highlighted
+  var YEARS = ['1st', '2nd', '3rd', '4th'];
+  var mode = 'local';          // 'cloud' (hosted, secure accounts), 'local' (this browser only) or 'offline'
+  var cloud = { user: null, setup: false, register: false, requireApproval: false, org: null };
+  var memoryOnly = false;
+  var db = { teachers: [], sections: [] };
+  var base = {};               // cloud: last-synced snapshot per section, used to work out what changed
+  var secRev = {};             // cloud: server revision of each loaded section
+  var teacher = null, sectionId = null, pendingTeacher = null;
+  var currentTab = 'mark', currentDate = todayStr(), currentSubject = '', currentPeriod = 1;
+  var LOCK_MS = 10 * 60 * 1000;  // a period locks itself 10 minutes after attendance is first taken (enforced by the server)
+  var serverOffset = 0, lockedShown = false;
+  function setOffset(serverNow, lockMs) {
+    if (typeof serverNow === 'number') serverOffset = serverNow - Date.now();
+    if (typeof lockMs === 'number' && lockMs > 0) LOCK_MS = lockMs;
+  }
+
+  /* ---------- helpers ---------- */
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function dateToStr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function todayStr() { return dateToStr(new Date()); }
+  function strToDate(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function isDateStr(s) {
+    if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var d = strToDate(s); return !isNaN(d) && dateToStr(d) === s;
+  }
+  function shiftDate(s, n) { var d = strToDate(s); d.setDate(d.getDate() + n); return dateToStr(d); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function str(v, max) { return typeof v === 'string' ? v.trim().slice(0, max) : ''; }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2800);
+  }
+  function showWarn(msg) { var w = $('warn'); w.textContent = msg; w.style.display = 'block'; }
+  function hideWarn() { $('warn').style.display = 'none'; }
+  function natural(a, b) { return a.localeCompare(b, undefined, { numeric: true }); }
+  function cmpStudent(a, b) { return natural(a.roll || '', b.roll || '') || natural(a.name, b.name); }
+  function cmpSection(a, b) { return a.year - b.year || natural(a.name, b.name); }
+  function secLabel(s) { return YEARS[s.year - 1] + ' Year · ' + s.name; }
+  function subjLabel(s) { return s || 'General'; }
+  function splitKey(k) { // key = date|period|subject (older data: date|subject, period 0)
+    var i = k.indexOf('|'), rest = k.slice(i + 1), m = /^([1-8])\|/.exec(rest);
+    return { date: k.slice(0, i), period: m ? +m[1] : 0, subject: m ? rest.slice(2) : rest };
+  }
+  function periodSession(sec, date, p) {
+    var pre = date + '|' + p + '|';
+    return Object.keys(sec.records).filter(function (k) { return k.indexOf(pre) === 0; })[0] || null;
+  }
+  function secCount(s) { return s.loaded === false ? (s.count || 0) : s.students.length; }
+
+  /* ---------- PIN hashing (local mode only) ---------- */
+  function hashPin(pin, salt) {
+    var text = salt + ':' + pin;
+    if (window.crypto && crypto.subtle && window.TextEncoder) {
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+      });
+    }
+    var h = 5381;
+    for (var i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+    return Promise.resolve('x' + h.toString(16));
+  }
+
+  /* ---------- data model / sanitising ---------- */
+  function sanitizeSection(s, keepIds) {
+    var year = Math.round(+s.year);
+    var out = { id: keepIds && typeof s.id === 'string' ? s.id : uid(), year: year >= 1 && year <= 4 ? year : 1,
+                name: str(s.name, 40) || 'Section', students: [], records: {} };
+    var map = {};
+    (Array.isArray(s.students) ? s.students : []).forEach(function (st) {
+      if (!st || typeof st.id !== 'string' || map[st.id]) return;
+      var name = str(st.name, 80); if (!name) return;
+      var id = keepIds ? st.id : uid();
+      map[st.id] = id;
+      out.students.push({ id: id, name: name, roll: str(st.roll, 20) });
+    });
+    var recs = s.records && typeof s.records === 'object' ? s.records : {};
+    Object.keys(recs).forEach(function (k) {
+      var i = k.indexOf('|');
+      if (i < 0 || !isDateStr(k.slice(0, i)) || !recs[k] || typeof recs[k] !== 'object') return;
+      var day = {};
+      Object.keys(recs[k]).forEach(function (sid) {
+        if (map[sid] && STATUSES.indexOf(recs[k][sid]) !== -1) day[map[sid]] = recs[k][sid];
+      });
+      if (Object.keys(day).length) out.records[k.slice(0, i) + '|' + str(k.slice(i + 1), 40)] = day;
+    });
+    out.students.sort(cmpStudent);
+    return out;
+  }
+  function sanitizeDb(data) {
+    var out = { teachers: [], sections: [] }, seen = {};
+    if (!data || typeof data !== 'object') return out;
+    (Array.isArray(data.teachers) ? data.teachers : []).forEach(function (t) {
+      if (!t || typeof t.id !== 'string' || seen[t.id]) return;
+      var name = str(t.name, 60); if (!name) return;
+      seen[t.id] = true;
+      out.teachers.push({ id: t.id, name: name, salt: typeof t.salt === 'string' ? t.salt : '',
+                          pinHash: typeof t.pinHash === 'string' && t.pinHash ? t.pinHash : null });
+    });
+    var sec = {};
+    (Array.isArray(data.sections) ? data.sections : []).forEach(function (s) {
+      if (!s || typeof s.id !== 'string' || sec[s.id]) return;
+      sec[s.id] = true; out.sections.push(sanitizeSection(s, true));
+    });
+    out.sections.sort(cmpSection);
+    return out;
+  }
+  function fromV2(old) { // earlier version: each teacher owned classes; they become shared sections
+    var data = { teachers: [], sections: [] };
+    (old && Array.isArray(old.teachers) ? old.teachers : []).forEach(function (t) {
+      if (!t) return;
+      data.teachers.push({ id: t.id, name: t.name, salt: t.salt, pinHash: t.pinHash });
+      (Array.isArray(t.classes) ? t.classes : []).forEach(function (c) {
+        var recs = {};
+        Object.keys(c.records || {}).forEach(function (d) { recs[d + '|'] = c.records[d]; });
+        data.sections.push({ id: c.id, year: 1, name: c.name, students: c.students, records: recs });
+      });
+    });
+    return sanitizeDb(data);
+  }
+
+  /* ---------- server API (cloud mode) ---------- */
+  function api(method, path, payload) {
+    return fetch('api/' + path, {
+      method: method, cache: 'no-store', credentials: 'same-origin',
+      headers: { 'X-Attendance': '1', 'Content-Type': 'application/json' },
+      body: payload === undefined ? undefined : JSON.stringify(payload)
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        return { ok: r.ok, status: r.status, body: j || {}, headers: r.headers };
+      });
+    });
+  }
+  function errMsg(res, fallback) { return (res.body && res.body.error) || fallback; }
+  function loadIndex() {
+    return api('GET', 'sections').then(function (res) {
+      if (res.status === 401) { sessionExpired(); return; }
+      if (!res.ok) throw new Error('index');
+      db = { teachers: [], sections: [] }; base = {}; secRev = {};
+      (res.body.sections || []).forEach(function (m) {
+        db.sections.push({ id: m.id, year: m.year, name: m.name, count: m.count || 0, students: [], records: {}, loaded: false });
+        base[m.id] = { meta: { year: m.year, name: m.name }, loaded: false, students: {}, records: {} };
+      });
+      db.sections.sort(cmpSection);
+    });
+  }
+  function sessionExpired() {
+    toast('Session expired. Please log in again.');
+    cloud.user = null; teacher = null; sectionId = null; db = { teachers: [], sections: [] }; base = {}; secRev = {};
+    api('GET', 'session').then(function (r) { cloud.setup = !!(r.body && r.body.setup); renderLogin(); }, renderLogin);
+  }
+
+  /* ---------- storage ---------- */
+  function readLocal() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) return sanitizeDb(JSON.parse(raw));
+      var old = localStorage.getItem(OLD_KEY);
+      if (old) return fromV2(JSON.parse(old));
+    } catch (e) { memoryOnly = true; }
+    return null;
+  }
+  function probeLocal() {
+    try { localStorage.setItem('probe', '1'); localStorage.removeItem('probe'); memoryOnly = false; }
+    catch (e) { memoryOnly = true; }
+    if (memoryOnly) showWarn('This browser is blocking storage for this page, so nothing will be saved. Use the hosted version of this app, or use "Download full backup".');
+  }
+  function load() {
+    if (location.protocol.indexOf('http') !== 0) return Promise.resolve(loadLocalMode());
+    return api('GET', 'session').then(function (res) {
+      if (!res.ok || res.body.cloud !== true) return loadLocalMode(); // plain static hosting: browser-only mode
+      mode = 'cloud'; cloud.user = res.body.user; cloud.setup = !!res.body.setup; cloud.requireApproval = !!res.body.requireApproval;
+      if (cloud.user) return loadIndex();
+    }, function () { mode = 'offline'; });
+  }
+  function loadLocalMode() {
+    mode = 'local';
+    var local = readLocal(); if (local) db = local;
+    if (memoryOnly) probeLocal();
+  }
+  var saving = false, dirty = false, retryTimer = null;
+  function save() {
+    if (mode === 'cloud') { dirty = true; if (!saving) flush(); return; }
+    try { localStorage.setItem(KEY, JSON.stringify(db)); if (!memoryOnly) hideWarn(); }
+    catch (e) {
+      memoryOnly = true;
+      showWarn('This browser is blocking storage, so changes will be lost on reload. Use "Download full backup".');
+    }
+  }
+
+  /* ---------- cloud sync: send only what changed ---------- */
+  function snapSection(s) {
+    var st = {};
+    s.students.forEach(function (x) { st[x.id] = { name: x.name, roll: x.roll }; });
+    return { meta: { year: s.year, name: s.name }, loaded: s.loaded !== false, students: st, records: clone(s.records) };
+  }
+  function snapshot() { var m = {}; db.sections.forEach(function (s) { m[s.id] = snapSection(s); }); return m; }
+  function diffSection(b, s) {
+    var p = {}, any = false;
+    if (!same(b.meta, s.meta)) { p.meta = s.meta; any = true; }
+    if (b.loaded && s.loaded) {
+      var st = {}, sc = false;
+      Object.keys(s.students).forEach(function (id) { if (!same(b.students[id], s.students[id])) { st[id] = s.students[id]; sc = true; } });
+      Object.keys(b.students).forEach(function (id) { if (!s.students[id]) { st[id] = null; sc = true; } });
+      if (sc) { p.students = st; any = true; }
+      var rc = {}, rAny = false, keys = {};
+      Object.keys(b.records).concat(Object.keys(s.records)).forEach(function (k) { keys[k] = 1; });
+      Object.keys(keys).forEach(function (k) {
+        var bd = b.records[k] || {}, sd = s.records[k] || {};
+        if (same(bd, sd)) return;
+        var d = {};
+        Object.keys(sd).forEach(function (i) { if (bd[i] !== sd[i]) d[i] = sd[i]; });
+        Object.keys(bd).forEach(function (i) { if (!(i in sd)) d[i] = null; });
+        if (Object.keys(d).length) { rc[k] = d; rAny = true; }
+      });
+      if (rAny) { p.records = rc; any = true; }
+    }
+    return any ? p : null;
+  }
+  function diffAll(snap) {
+    var out = {}, any = false;
+    Object.keys(snap).forEach(function (id) {
+      var s = snap[id], b = base[id];
+      if (!b) { out[id] = { meta: s.meta, students: s.students, records: s.records }; any = true; return; }
+      var p = diffSection(b, s); if (p) { out[id] = p; any = true; }
+    });
+    Object.keys(base).forEach(function (id) { if (!snap[id]) { out[id] = null; any = true; } });
+    return any ? out : null;
+  }
+  function flush() {
+    clearTimeout(retryTimer);
+    saving = true; dirty = false;
+    var snap = snapshot(), patch = diffAll(snap);
+    if (!patch) { saving = false; return; }
+    api('POST', 'patch', { sections: patch }).then(function (res) {
+      if (res.status === 401) { sessionExpired(); return; }
+      if (!res.ok) throw new Error(errMsg(res, 'save failed'));
+      Object.keys(snap).forEach(function (id) { // keep newer "loaded" state if a section finished loading meanwhile
+        if (!snap[id].loaded && base[id] && base[id].loaded) snap[id] = base[id];
+      });
+      base = snap; hideWarn();
+      setOffset(res.body.now, res.body.lock_ms);
+      var results = res.body.results || {}, bad = [], sessChanged = false;
+      Object.keys(results).forEach(function (id) {
+        var r = results[id], s = db.sections.filter(function (x) { return x.id === id; })[0];
+        if (r && r.error) { bad.push({ id: id, msg: r.error }); return; }
+        if (r && r.sessions && s && !same(s.sessions, r.sessions)) { s.sessions = r.sessions; sessChanged = true; }
+      });
+      bad.forEach(function (b) { // the server refused (e.g. period locked): drop our version and reload the real one
+        var s = db.sections.filter(function (x) { return x.id === b.id; })[0]; if (!s) return;
+        s.loaded = false; s.loading = false; s.students = []; s.records = {};
+        base[b.id] = { meta: { year: s.year, name: s.name }, loaded: false, students: {}, records: {} };
+      });
+      if (bad.length) { toast(bad[0].msg); if (teacher) render(); }
+      else if (sessChanged && teacher) render();
+    }).catch(function (e) {
+      showWarn('Could not save (' + (e && e.message ? e.message : 'network problem') + '). Retrying shortly — keep this page open.');
+      retryTimer = setTimeout(function () { if (!saving && teacher) flush(); }, 5000);
+    }).then(function () { saving = false; if (dirty) flush(); });
+  }
+  window.addEventListener('beforeunload', function (e) {
+    if (mode === 'cloud' && (saving || dirty)) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  /* ---------- cloud: load one section, and pick up other people's changes ---------- */
+  function applyLoaded(sec, data, rev) {
+    sec.sessions = data.sessions && typeof data.sessions === 'object' ? data.sessions : {};
+    var c = sanitizeSection(data, true);
+    sec.year = c.year; sec.name = c.name; sec.students = c.students; sec.records = c.records;
+    sec.count = c.students.length; sec.loaded = true; sec.loading = false;
+    secRev[sec.id] = rev; base[sec.id] = snapSection(sec);
+  }
+  function loadSection(sec) {
+    if (sec.loading) return;
+    sec.loading = true;
+    api('GET', 'sections/' + encodeURIComponent(sec.id)).then(function (res) {
+      if (res.status === 401) { sessionExpired(); return; }
+      if (!res.ok) throw new Error(errMsg(res, 'load failed'));
+      setOffset(res.body.now, res.body.lock_ms);
+      applyLoaded(sec, res.body.section, res.headers.get('X-Rev'));
+      if (teacher) render();
+    }).catch(function (e) {
+      sec.loading = false; toast('Could not load this section: ' + (e && e.message ? e.message : 'network problem'));
+    });
+  }
+  function mergeIndex(list) {
+    var changed = false, ids = {};
+    list.forEach(function (m) {
+      ids[m.id] = 1;
+      var s = db.sections.filter(function (x) { return x.id === m.id; })[0];
+      if (!s) {
+        db.sections.push({ id: m.id, year: m.year, name: m.name, count: m.count || 0, students: [], records: {}, loaded: false });
+        base[m.id] = { meta: { year: m.year, name: m.name }, loaded: false, students: {}, records: {} };
+        changed = true;
+      } else {
+        if (s.year !== m.year || s.name !== m.name) {
+          s.year = m.year; s.name = m.name; if (base[s.id]) base[s.id].meta = { year: m.year, name: m.name }; changed = true;
+        }
+        if (s.loaded === false && s.count !== m.count) { s.count = m.count; changed = true; }
+      }
+    });
+    var before = db.sections.length;
+    db.sections = db.sections.filter(function (s) { if (ids[s.id]) return true; delete base[s.id]; return false; });
+    if (db.sections.length !== before) changed = true;
+    db.sections.sort(cmpSection);
+    return changed;
+  }
+  var connWarn = false;
+  function poll() {
+    if (mode !== 'cloud' || !teacher || saving || dirty || document.hidden) return;
+    api('GET', 'sections').then(function (res) {
+      if (res.status === 401) { sessionExpired(); return; }
+      if (!res.ok) throw new Error('poll');
+      if (connWarn) { hideWarn(); connWarn = false; }
+      if (saving || dirty) return;
+      var changed = mergeIndex(res.body.sections || []);
+      var sec = curSection();
+      var next = sec && sec.loaded ? api('GET', 'sections/' + encodeURIComponent(sec.id) + '?have=' + encodeURIComponent(secRev[sec.id] || '')) : Promise.resolve(null);
+      return next.then(function (r2) {
+        if (saving || dirty || !teacher) return;
+        if (r2 && r2.ok) setOffset(r2.body.now, r2.body.lock_ms);
+        if (r2 && r2.ok && !r2.body.unchanged && r2.body.section) { applyLoaded(sec, r2.body.section, r2.headers.get('X-Rev')); changed = true; }
+        if (changed) render();
+      });
+    }).catch(function () { showWarn('Cannot reach the server right now. Reconnecting…'); connWarn = true; });
+  }
+  setInterval(poll, 8000);
+
+  /* ---------- current section helpers ---------- */
+  function curSection() {
+    var s = db.sections.filter(function (x) { return x.id === sectionId; })[0];
+    if (!s && db.sections.length) { s = db.sections[0]; sectionId = s.id; }
+    return s || null;
+  }
+  function curLoaded() { var s = curSection(); return s && s.loaded !== false ? s : null; }
+  function usable(sec, container) { // returns false (and starts loading) when the section's data isn't here yet
+    if (sec.loaded !== false) return true;
+    container.innerHTML = '<div class="empty">Loading&hellip;</div>';
+    loadSection(sec);
+    return false;
+  }
+  function needSection(container) {
+    container.innerHTML = '<div class="empty">No sections yet. Create them in <b>Settings</b> (one click adds A1–A10 and B1–B10 for 1st year).</div>';
+  }
+  function allSubjects(sec) {
+    var seen = {};
+    (sec ? [sec] : db.sections).forEach(function (s) {
+      Object.keys(s.records).forEach(function (k) { seen[splitKey(k).subject] = true; });
+    });
+    return Object.keys(seen).sort(natural);
+  }
+
+  /* ---------- login ---------- */
+  function renderLogin() {
+    $('loading').hidden = true;
+    $('title').textContent = 'College Attendance Tracker';
+    ['secSel', 'who', 'logout'].forEach(function (id) { $(id).hidden = true; });
+    ['app', 'login', 'cloudLogin', 'offline'].forEach(function (id) { $(id).hidden = true; });
+    if (mode === 'offline') { $('offline').hidden = false; return; }
+    if (mode === 'cloud') {
+      $('cloudLogin').hidden = false;
+      var creating = cloud.setup || cloud.register;
+      var newCollege = $('cMode').value === 'new';
+      $('cCode').hidden = newCollege; $('cCollege').hidden = !newCollege;
+      $('setupExtra').hidden = !creating;
+      $('setupNote').textContent = newCollege
+        ? 'Your sections, students and attendance are private: only you can see them. Password must be 8+ characters.'
+        : 'Your administrator gives you the college code. Your own data stays private to you. Password must be 8+ characters.';
+      $('cTitle').textContent = cloud.register ? 'Create your account' : 'Log in';
+      $('cSubmit').textContent = creating ? 'Create account' : 'Log in';
+      $('toggleReg').hidden = cloud.setup;
+      $('toggleReg').textContent = cloud.register ? 'Already have an account? Log in' : 'New here? Create an account';
+      $('cPass').setAttribute('autocomplete', creating ? 'new-password' : 'current-password');
+      return;
+    }
+    $('login').hidden = false;
+    var box = $('teacherList');
+    if (!db.teachers.length) { box.innerHTML = '<div class="empty">Welcome! Create the first teacher below.</div>'; return; }
+    box.innerHTML = '<h2>Who is using this?</h2>' + db.teachers.map(function (t) {
+      return '<button type="button" class="teacher-btn" data-tid="' + esc(t.id) + '">' + esc(t.name) +
+        (t.pinHash ? ' <span class="muted">🔒</span>' : '') + '</button>';
+    }).join('') + '<form id="pinForm" hidden class="row"><input id="pinInput" type="password" class="grow" placeholder="Enter PIN" autocomplete="off">' +
+      '<button class="primary" type="submit">Open</button></form>';
+  }
+  function enter(t) {
+    teacher = t; pendingTeacher = null;
+    sectionId = db.sections.length ? db.sections[0].id : null;
+    currentDate = todayStr(); currentPeriod = 1; currentSubject = '';
+    ['login', 'cloudLogin', 'offline'].forEach(function (id) { $(id).hidden = true; });
+    $('app').hidden = false;
+    $('who').textContent = t.name; $('who').hidden = false; $('logout').hidden = false;
+    showTab(db.sections.length ? 'mark' : 'settings');
+    if (mode === 'cloud') loadOrg();
+  }
+  function loadOrg() {
+    return api('GET', 'org').then(function (res) {
+      if (!res.ok) return;
+      cloud.org = res.body;
+      $('title').textContent = (res.body.name || 'College') + ' \u00b7 Attendance';
+      if (currentTab === 'settings') renderSettings();
+    }).catch(function () {});
+  }
+  function logout() {
+    if (mode === 'cloud') {
+      api('POST', 'logout', {}).then(function () {}, function () {}).then(function () {
+        cloud.user = null; teacher = null; sectionId = null; db = { teachers: [], sections: [] }; base = {}; secRev = {};
+        api('GET', 'session').then(function (r) { cloud.setup = !!(r.body && r.body.setup); renderLogin(); }, renderLogin);
+      });
+      return;
+    }
+    teacher = null; sectionId = null; pendingTeacher = null; renderLogin();
+  }
+
+  /* ---------- tabs / chrome ---------- */
+  function renderChrome() {
+    var sel = $('secSel');
+    if (!db.sections.length) { sel.hidden = true; return; }
+    sel.hidden = false;
+    sel.innerHTML = db.sections.map(function (s) {
+      return '<option value="' + esc(s.id) + '">' + esc(secLabel(s)) + '</option>';
+    }).join('');
+    var cur = curSection(); sel.value = cur ? cur.id : '';
+  }
+  function showTab(name) {
+    currentTab = name;
+    ['mark', 'students', 'reports', 'settings'].forEach(function (t) { $('tab-' + t).hidden = t !== name; });
+    Array.prototype.forEach.call($('tabs').children, function (b) {
+      b.classList.toggle('active', b.getAttribute('data-tab') === name);
+    });
+    render();
+  }
+  function render() {
+    if (!teacher) return;
+    renderChrome();
+    if (currentTab === 'mark') renderMark();
+    else if (currentTab === 'students') renderStudents();
+    else if (currentTab === 'reports') renderReports();
+    else renderSettings();
+  }
+
+  /* ---------- mark ---------- */
+  function sessionKey() { return currentDate + '|' + currentPeriod + '|' + currentSubject; }
+  function renderMark() {
+    $('markDate').value = currentDate;
+    var sec0 = curSection();
+    renderLockBar();
+    if (sec0 && sec0.loaded !== false) { var ex = periodSession(sec0, currentDate, currentPeriod); if (ex) currentSubject = splitKey(ex).subject; }
+    if (document.activeElement !== $('subject')) $('subject').value = currentSubject;
+    $('periodBar').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8].map(function (p) {
+      var has = sec0 && sec0.loaded !== false && periodSession(sec0, currentDate, p);
+      var lk = sec0 && lockStateFor(sec0, currentDate, p).locked;
+      return '<button type="button" data-p="' + p + '" class="' + (p === currentPeriod ? 'on ' : '') + (has ? 'has ' : '') + (lk ? 'locked' : '') + '" aria-label="Period ' + p + (lk ? ' (locked)' : has ? ' (taken)' : '') + '">P' + p + '</button>';
+    }).join('');
+    $('subjectList').innerHTML = allSubjects(null).filter(Boolean).map(function (s) { return '<option value="' + esc(s) + '">'; }).join('');
+    var sec = curSection(), list = $('markList');
+    if (!sec) { needSection(list); $('markSummary').textContent = ''; return; }
+    if (!usable(sec, list)) { $('markSummary').textContent = ''; return; }
+    if (!sec.students.length) { list.innerHTML = '<div class="empty">No students in this section yet. Add some in the Students tab.</div>'; $('markSummary').textContent = ''; return; }
+    var day = sec.records[sessionKey()] || {};
+    var dis = lockStateFor(sec, currentDate, currentPeriod).locked ? ' disabled' : '';
+    list.innerHTML = sec.students.map(function (s) {
+      var cur = day[s.id];
+      return '<div class="item"><div><div class="name">' + esc(s.name) + '</div>' +
+        (s.roll ? '<div class="muted">' + esc(s.roll) + '</div>' : '') + '</div>' +
+        '<div class="seg" data-sid="' + esc(s.id) + '">' + STATUSES.map(function (st) {
+          return '<button type="button" data-s="' + st + '" class="' + (cur === st ? 'on' : '') + '"' + dis + '>' + LABELS[st] + '</button>';
+        }).join('') + '</div></div>';
+    }).join('');
+    var counts = {}, marked = 0;
+    STATUSES.forEach(function (s) { counts[s] = 0; });
+    sec.students.forEach(function (s) { if (day[s.id]) { counts[day[s.id]]++; marked++; } });
+    $('markSummary').textContent = marked + '/' + sec.students.length + ' marked · ' +
+      STATUSES.map(function (s) { return counts[s] + ' ' + s; }).join(', ');
+  }
+  /* ---------- period locking ---------- */
+  function lockStateFor(sec, date, p) {
+    if (mode !== 'cloud' || !sec || sec.loaded === false) return { kind: 'none', locked: false };
+    var meta = (sec.sessions || {})[date + '|' + p];
+    if (meta && meta.lockedAt) return { kind: 'locked', locked: true, by: meta.lockedBy, at: meta.lockedAt };
+    return { kind: 'open', locked: false };
+  }
+  function renderLockBar() {
+    var bar = $('lockBar'), sec = curSection();
+    if (mode !== 'cloud' || !sec || sec.loaded === false) { bar.innerHTML = ''; lockedShown = false; return; }
+    var ls = lockStateFor(sec, currentDate, currentPeriod); lockedShown = ls.locked;
+    if (ls.locked) {
+      var when = new Date(ls.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      bar.innerHTML = '<span><b>\ud83d\udd12 Locked</b> <span class="muted">by ' + esc(ls.by || 'a teacher') + ' at ' + esc(when) + '</span></span> ' +
+        '<button type="button" id="unlockBtn">Unlock</button>';
+    } else if (periodSession(sec, currentDate, currentPeriod)) {
+      bar.innerHTML = '<button type="button" id="lockNow">\ud83d\udd12 Lock this period</button> <span class="muted">Lock it when you finish so nobody can change it.</span>';
+    } else {
+      bar.innerHTML = '<span class="muted">Mark attendance, then lock the period when you finish.</span>';
+    }
+  }
+  function lockCall(kind) {
+    var sec = curLoaded(); if (!sec) return;
+    if (saving || dirty) { toast('Still saving \u2014 try again in a moment'); return; }
+    if (kind === 'unlock' && !confirm('Unlock period ' + currentPeriod + ' on ' + currentDate + '? You will be able to change it again.')) return;
+    api('POST', kind, { sectionId: sec.id, date: currentDate, period: currentPeriod }).then(function (res) {
+      if (res.status === 401) { sessionExpired(); return; }
+      if (!res.ok) { toast(errMsg(res, 'Could not ' + kind)); return; }
+      sec.sessions = sec.sessions || {};
+      if (res.body.session) sec.sessions[currentDate + '|' + currentPeriod] = res.body.session; else delete sec.sessions[currentDate + '|' + currentPeriod];
+      renderMark(); toast(kind === 'lock' ? 'Period locked' : 'Unlocked');
+    }).catch(function () { toast('Cannot reach the server'); });
+  }  function periodIsLocked() {
+    var sec = curSection();
+    if (sec && lockStateFor(sec, currentDate, currentPeriod).locked) { toast('This period is locked.'); return true; }
+    return false;
+  }
+  function setStatus(sid, status) {
+    var sec = curLoaded(); if (!sec) return;
+    if (periodIsLocked()) return;
+    var k = sessionKey(), day = sec.records[k] || (sec.records[k] = {});
+    if (day[sid] === status) delete day[sid]; else day[sid] = status; // click again to unset
+    if (!Object.keys(day).length) delete sec.records[k];
+    save(); renderMark();
+  }
+
+  /* ---------- students ---------- */
+  function renderStudents() {
+    var sec = curSection(), list = $('studentList');
+    if (!sec) { needSection(list); return; }
+    if (!usable(sec, list)) return;
+    if (!sec.students.length) { list.innerHTML = '<div class="empty">No students yet.</div>'; return; }
+    list.innerHTML = '<div class="muted">' + sec.students.length + ' student(s) in ' + esc(secLabel(sec)) + '</div>' +
+      sec.students.map(function (s) {
+        return '<div class="item"><div><div class="name">' + esc(s.name) + '</div>' +
+          (s.roll ? '<div class="muted">' + esc(s.roll) + '</div>' : '') + '</div>' +
+          '<div class="row"><button type="button" data-act="edit" data-sid="' + esc(s.id) + '">Edit</button>' +
+          '<button type="button" class="danger" data-act="del" data-sid="' + esc(s.id) + '">Delete</button></div></div>';
+      }).join('');
+  }
+  function findStudent(sec, id) { return sec.students.filter(function (s) { return s.id === id; })[0]; }
+  function editStudent(id) {
+    var sec = curLoaded(), s = sec && findStudent(sec, id); if (!s) return;
+    var name = prompt('Name:', s.name); if (name === null) return;
+    name = name.trim(); if (!name) { toast('Name cannot be empty'); return; }
+    var roll = prompt('Roll / Reg. no. (optional):', s.roll); if (roll === null) return;
+    s.name = name.slice(0, 80); s.roll = roll.trim().slice(0, 20);
+    sec.students.sort(cmpStudent); save(); render();
+  }
+  function deleteStudent(id) {
+    var sec = curLoaded(), s = sec && findStudent(sec, id); if (!s) return;
+    if (!confirm('Delete "' + s.name + '" and all of their attendance records?')) return;
+    sec.students = sec.students.filter(function (x) { return x.id !== id; });
+    Object.keys(sec.records).forEach(function (k) {
+      delete sec.records[k][id];
+      if (!Object.keys(sec.records[k]).length) delete sec.records[k];
+    });
+    save(); render();
+  }
+  function parseBulk(text) {
+    return text.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      var m = l.split(/\t|,/);
+      if (m.length > 1) { var roll = m.shift(); return { roll: str(roll, 20), name: str(m.join(', '), 80) }; }
+      return { roll: '', name: str(l, 80) };
+    }).filter(function (x) { return x.name; });
+  }
+
+  /* ---------- reports ---------- */
+  function computeReport() {
+    var sec = curLoaded(); if (!sec) return null;
+    var from = $('from').value, to = $('to').value, pf = $('perFilter').value || '*';
+    var keys = Object.keys(sec.records).filter(function (k) {
+      var p = splitKey(k);
+      return (!from || p.date >= from) && (!to || p.date <= to) && (pf === '*' || +pf === p.period);
+    }).sort();
+    var rows = sec.students.map(function (s) {
+      var n = { present: 0, late: 0, absent: 0, excused: 0 };
+      keys.forEach(function (k) { var st = sec.records[k][s.id]; if (st) n[st]++; });
+      var counted = n.present + n.late + n.absent; // excused sessions don't count against attendance
+      return { s: s, n: n, pct: counted ? Math.round((n.present + n.late) / counted * 100) : null };
+    });
+    return { sec: sec, keys: keys, rows: rows };
+  }
+  function renderReports() {
+    var box = $('reportTable'), sec = curSection();
+    $('regTable').innerHTML = '';
+    var pf = $('perFilter'), pv = pf.value || '*';
+    pf.innerHTML = '<option value="*">All periods</option>' + [1, 2, 3, 4, 5, 6, 7, 8].map(function (p) { return '<option value="' + p + '">Period ' + p + '</option>'; }).join('');
+    pf.value = pv;
+    if (!sec) { needSection(box); return; }
+    if (!usable(sec, box)) return;
+    var rep = computeReport();
+    if (!rep.rows.length) { box.innerHTML = '<div class="empty">No students in this section.</div>'; return; }
+    box.innerHTML = '<h2>' + esc(secLabel(rep.sec)) + '</h2><p class="muted">' + rep.keys.length +
+      ' session(s). Attendance % = (present + late) / (present + late + absent); excused is ignored. Below ' + LOW + '% is shown in red.</p>' +
+      '<table><thead><tr><th>Roll</th><th>Name</th><th class="num">P</th><th class="num">L</th><th class="num">A</th><th class="num">E</th><th>Attendance</th></tr></thead><tbody>' +
+      rep.rows.map(function (r) {
+        return '<tr class="' + (r.pct !== null && r.pct < LOW ? 'low' : '') + '"><td>' + esc(r.s.roll) + '</td><td>' + esc(r.s.name) + '</td>' +
+          '<td class="num">' + r.n.present + '</td><td class="num">' + r.n.late + '</td><td class="num">' + r.n.absent + '</td><td class="num">' + r.n.excused + '</td>' +
+          '<td>' + (r.pct === null ? '<span class="muted">—</span>' :
+            '<div class="row" style="flex-wrap:nowrap"><div class="bar grow"><i style="width:' + r.pct + '%"></i></div><b>' + r.pct + '%</b></div>') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    renderRegister(sec);
+  }
+  function renderRegister(sec) {
+    var inp = $('regDate'); if (!inp.value) inp.value = currentDate;
+    var date = inp.value, keys = [];
+    for (var p = 1; p <= 8; p++) keys.push(periodSession(sec, date, p));
+    var taken = keys.filter(Boolean).length, box = $('regTable');
+    if (!sec.students.length) { box.innerHTML = ''; return; }
+    var L = { present: 'P', late: 'L', absent: 'A', excused: 'E' };
+    box.innerHTML = '<p class="muted">' + esc(secLabel(sec)) + ' \u00b7 ' + esc(date) + ' \u00b7 ' + taken + ' of 8 periods taken</p>' +
+      '<table><thead><tr><th>Roll</th><th>Name</th>' + keys.map(function (k, i) {
+        return '<th class="num" style="text-align:center" title="' + esc(k ? subjLabel(splitKey(k).subject) : 'Not taken') + '">' + (i + 1) + '</th>';
+      }).join('') + '<th class="num">Attended</th></tr></thead><tbody>' +
+      sec.students.map(function (s) {
+        var att = 0, cnt = 0;
+        var cells = keys.map(function (k) {
+          var st = k && sec.records[k][s.id];
+          if (st) { if (st !== 'excused') { cnt++; if (st !== 'absent') att++; } return '<td class="cell ' + st + '">' + L[st] + '</td>'; }
+          return '<td class="cell none">' + (k ? '?' : '\u00b7') + '</td>';
+        }).join('');
+        return '<tr><td>' + esc(s.roll) + '</td><td>' + esc(s.name) + '</td>' + cells + '<td class="num">' + att + '/' + cnt + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function csvCell(v) {
+    v = String(v);
+    if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; // block spreadsheet formula injection
+    return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function download(filename, text, mime) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function safeName(s) { return s.replace(/[^\w\-]+/g, '_').slice(0, 40) || 'file'; }
+  function exportCsv() {
+    var rep = computeReport();
+    if (!rep || !rep.keys.length) { toast('No records in the selected range'); return; }
+    var lines = ['Date,Period,Section,Subject,Roll,Name,Status'];
+    rep.keys.forEach(function (k) {
+      var p = splitKey(k);
+      rep.rows.forEach(function (r) {
+        var st = rep.sec.records[k][r.s.id];
+        if (st) lines.push([p.date, p.period || '', secLabel(rep.sec), p.subject, r.s.roll, r.s.name, LABELS[st]].map(csvCell).join(','));
+      });
+    });
+    download('attendance-' + safeName(secLabel(rep.sec)) + '.csv', '\ufeff' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+  }
+
+  /* ---------- settings ---------- */
+  function renderSettings() {
+    var names = [];
+    for (var i = 1; i <= 10; i++) names.push('A' + i);
+    for (i = 1; i <= 10; i++) names.push('B' + i);
+    $('secNames').innerHTML = names.map(function (n) { return '<option value="' + n + '">'; }).join('');
+    var isCloud = mode === 'cloud';
+    $('localAccount').hidden = isCloud;
+    $('myAccount').hidden = !isCloud;
+    var isAdmin = isCloud && teacher && teacher.role === 'admin';
+    $('orgCard').hidden = true; // college codes are no longer offered in the UI
+    if (isAdmin && cloud.org) { if (document.activeElement !== $('orgName')) $('orgName').value = cloud.org.name || ''; $('orgCode').textContent = cloud.org.code || ''; }
+    $('usersCard').hidden = true; // account management is no longer needed: everyone signs up themselves
+    var box = $('sectionList');
+    if (!db.sections.length) { box.innerHTML = '<div class="empty">No sections yet.</div>'; return; }
+    box.innerHTML = db.sections.map(function (s) {
+      return '<div class="item"><div><div class="name">' + esc(secLabel(s)) + '</div><div class="muted">' + secCount(s) + ' student(s)</div></div>' +
+        '<div class="row"><button type="button" data-act="rename" data-id="' + esc(s.id) + '">Rename</button>' +
+        '<button type="button" class="danger" data-act="delete" data-id="' + esc(s.id) + '">Delete</button></div></div>';
+    }).join('');
+  }
+  function hasSection(year, name) {
+    return db.sections.some(function (s) { return s.year === year && s.name.toLowerCase() === name.toLowerCase(); });
+  }
+  function addSection(year, name) {
+    var s = { id: uid(), year: year, name: name, students: [], records: {}, loaded: true };
+    db.sections.push(s); db.sections.sort(cmpSection); return s;
+  }
+  function renderUsers() {
+    api('GET', 'users').then(function (res) {
+      if (res.status === 401) { sessionExpired(); return; }
+      if (!res.ok) throw new Error('users');
+      var users = res.body.users || [], requireApproval = !!res.body.requireApproval;
+      $('reqApproval').checked = requireApproval;
+      $('userList').innerHTML = users.map(function (u) {
+        return '<div class="item"><div><div class="name">' + esc(u.name) + '</div><div class="muted">' + esc(u.username) + ' · ' + esc(u.role) + (u.status === 'pending' && requireApproval ? ' · <b>waiting for approval</b>' : '') + '</div></div>' +
+          (teacher && u.id === teacher.id ? '<span class="muted">(you)</span>' :
+            '<div class="row">' + (u.status === 'pending' && requireApproval ? '<button type="button" class="primary" data-act="approve" data-id="' + esc(u.id) + '">Approve</button>' : '') +
+            '<button type="button" class="danger" data-act="deluser" data-id="' + esc(u.id) + '" data-name="' + esc(u.username) + '">' + (u.status === 'pending' && requireApproval ? 'Reject' : 'Delete') + '</button></div>') + '</div>';
+      }).join('');
+      $('rUser').innerHTML = users.map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.name) + ' (' + esc(u.username) + ')</option>'; }).join('');
+    }).catch(function () { toast('Could not load accounts'); });
+  }
+  function backup() {
+    download('attendance-backup-' + todayStr() + '.json', JSON.stringify({ kind: 'college-attendance-backup', version: 3, teachers: db.teachers, sections: db.sections }, null, 2), 'application/json');
+  }
+  function restore(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.sections) || !Array.isArray(data.teachers)) throw new Error('bad');
+        var clean = sanitizeDb(data);
+        if (!confirm('Replace ALL current data with this backup (' + clean.teachers.length + ' teachers, ' + clean.sections.length + ' sections)?')) return;
+        db = clean; save(); logout(); toast('Backup restored. Please log in again.');
+      } catch (e) { toast('Not a valid backup file'); }
+    };
+    reader.onerror = function () { toast('Could not read file'); };
+    reader.readAsText(file);
+  }
+  function verifyPin(then) {
+    if (!teacher.pinHash) return then();
+    var cur = prompt('Enter your PIN:'); if (cur === null) return;
+    hashPin(cur, teacher.salt).then(function (h) { if (h === teacher.pinHash) then(); else toast('Wrong PIN'); });
+  }
+  function changePin() {
+    verifyPin(function () {
+      var np = prompt('New PIN (4+ characters). Leave empty to remove the PIN:');
+      if (np === null) return;
+      if (np === '') { teacher.pinHash = null; teacher.salt = ''; save(); toast('PIN removed'); return; }
+      if (np.length < 4) { toast('PIN must be at least 4 characters'); return; }
+      var salt = uid();
+      hashPin(np, salt).then(function (h) { teacher.salt = salt; teacher.pinHash = h; save(); toast('PIN updated'); });
+    });
+  }
+  function deleteMe() {
+    verifyPin(function () {
+      if (!confirm('Delete the login "' + teacher.name + '"? Sections and attendance are kept.')) return;
+      db.teachers = db.teachers.filter(function (t) { return t.id !== teacher.id; });
+      save(); logout();
+    });
+  }
+
+  /* ---------- wiring ---------- */
+  $('retryConn').addEventListener('click', function () {
+    $('offline').hidden = true; $('loading').hidden = false;
+    load().then(function () {
+      if (mode === 'cloud' && cloud.user) enter(cloud.user); else renderLogin();
+    });
+  });
+  $('cloudForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var setup = cloud.setup, reg = cloud.register;
+    var payload = { username: $('cUser').value, password: $('cPass').value };
+    if (setup || reg) { payload.name = $('cName').value; payload.mode = $('cMode').value; payload.code = $('cCode').value; payload.college = $('cCollege').value.trim() || ((payload.name || '').trim() || 'My College'); }
+    $('cSubmit').disabled = true;
+    api('POST', setup ? 'setup' : reg ? 'register' : 'login', payload).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not log in')); return; }
+      if (reg && !res.body.user) {
+        cloud.register = false; $('cPass').value = ''; renderLogin();
+        toast('Account created. You can log in once the administrator approves it.');
+        return;
+      }
+      cloud.user = res.body.user; cloud.setup = false;
+      $('cPass').value = '';
+      return loadIndex().then(function () { enter(cloud.user); });
+    }).catch(function () { toast('Cannot reach the server'); })
+      .then(function () { $('cSubmit').disabled = false; });
+  });
+  $('cMode').addEventListener('change', renderLogin);
+  $('toggleReg').addEventListener('click', function () { cloud.register = !cloud.register; renderLogin(); });
+  $('teacherList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-tid]'); if (!b) return;
+    var t = db.teachers.filter(function (x) { return x.id === b.getAttribute('data-tid'); })[0]; if (!t) return;
+    if (!t.pinHash) return enter(t);
+    pendingTeacher = t;
+    $('pinForm').hidden = false; $('pinInput').value = ''; $('pinInput').placeholder = 'PIN for ' + t.name; $('pinInput').focus();
+  });
+  $('teacherList').addEventListener('submit', function (e) {
+    if (e.target.id !== 'pinForm') return;
+    e.preventDefault();
+    var t = pendingTeacher; if (!t) return;
+    hashPin($('pinInput').value, t.salt).then(function (h) {
+      if (h === t.pinHash) enter(t); else { toast('Wrong PIN'); $('pinInput').value = ''; }
+    });
+  });
+  $('signupForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = str($('tName').value, 60), pin = $('tPin').value;
+    if (!name) { toast('Enter a name'); return; }
+    if (pin && pin.length < 4) { toast('PIN must be at least 4 characters'); return; }
+    if (db.teachers.some(function (t) { return t.name.toLowerCase() === name.toLowerCase(); })) { toast('A teacher with that name already exists'); return; }
+    var t = { id: uid(), name: name, salt: '', pinHash: null };
+    var finish = function () {
+      db.teachers.push(t); save();
+      $('tName').value = ''; $('tPin').value = '';
+      enter(t);
+    };
+    if (pin) { t.salt = uid(); hashPin(pin, t.salt).then(function (h) { t.pinHash = h; finish(); }); } else finish();
+  });
+  $('logout').addEventListener('click', logout);
+  $('secSel').addEventListener('change', function () { sectionId = this.value; currentSubject = ''; render(); });
+  $('tabs').addEventListener('click', function (e) {
+    var t = e.target.getAttribute && e.target.getAttribute('data-tab'); if (t) showTab(t);
+  });
+
+  $('markList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-s]'); if (b) setStatus(b.parentNode.getAttribute('data-sid'), b.getAttribute('data-s'));
+  });
+  function setDate(s) { if (isDateStr(s)) { currentDate = s; renderMark(); } }
+  $('periodBar').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-p]'); if (!b) return;
+    currentPeriod = +b.getAttribute('data-p'); currentSubject = ''; renderMark();
+  });
+  $('markDate').addEventListener('change', function () { if (this.value) setDate(this.value); else this.value = currentDate; });
+  $('subject').addEventListener('change', function () {
+    var sec = curLoaded(), old = sessionKey(), next = str(this.value, 36);
+    if (periodIsLocked()) { this.value = currentSubject; return; }
+    currentSubject = next;
+    if (sec && sec.records[old] && sessionKey() !== old && !sec.records[sessionKey()]) { // renaming the subject of an already-taken period
+      sec.records[sessionKey()] = sec.records[old]; delete sec.records[old]; save();
+    }
+    renderMark();
+  });
+  $('prevDay').addEventListener('click', function () { setDate(shiftDate(currentDate, -1)); });
+  $('nextDay').addEventListener('click', function () { setDate(shiftDate(currentDate, 1)); });
+  $('today').addEventListener('click', function () { setDate(todayStr()); });
+  $('lockBar').addEventListener('click', function (e) {
+    if (e.target.id === 'lockNow') lockCall('lock'); else if (e.target.id === 'unlockBtn') lockCall('unlock');
+  });
+  $('allPresent').addEventListener('click', function () {
+    var sec = curLoaded(); if (!sec || !sec.students.length) return;
+    if (periodIsLocked()) return;
+    var k = sessionKey(), day = sec.records[k] || (sec.records[k] = {});
+    sec.students.forEach(function (s) { if (!day[s.id]) day[s.id] = 'present'; });
+    save(); renderMark(); toast('Unmarked students set to present');
+  });
+  $('clearDay').addEventListener('click', function () {
+    var sec = curLoaded(); if (!sec || !sec.records[sessionKey()]) return;
+    if (periodIsLocked()) return;
+    if (!confirm('Clear all marks for ' + currentDate + ', period ' + currentPeriod + '?')) return;
+    delete sec.records[sessionKey()]; save(); renderMark();
+  });
+
+  $('addStudent').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var sec = curLoaded(); if (!sec) { toast(curSection() ? 'Section is still loading' : 'Create a section in Settings first'); return; }
+    var name = str($('sName').value, 80), roll = str($('sRoll').value, 20);
+    if (!name) { toast('Enter a name'); return; }
+    if (roll && sec.students.some(function (s) { return s.roll === roll; }) && !confirm('Roll no. ' + roll + ' is already used. Add anyway?')) return;
+    sec.students.push({ id: uid(), name: name, roll: roll }); sec.students.sort(cmpStudent);
+    $('sName').value = ''; $('sRoll').value = ''; save(); render(); $('sRoll').focus();
+  });
+  $('bulkAdd').addEventListener('click', function () {
+    var sec = curLoaded(); if (!sec) { toast(curSection() ? 'Section is still loading' : 'Create a section in Settings first'); return; }
+    var list = parseBulk($('bulkText').value), added = 0, skipped = 0;
+    list.forEach(function (x) {
+      if (x.roll && sec.students.some(function (s) { return s.roll === x.roll; })) { skipped++; return; }
+      sec.students.push({ id: uid(), name: x.name, roll: x.roll }); added++;
+    });
+    if (!list.length) { toast('Nothing to add'); return; }
+    sec.students.sort(cmpStudent); $('bulkText').value = ''; save(); render();
+    toast('Added ' + added + (skipped ? ', skipped ' + skipped + ' with a roll no. already used' : ''));
+  });
+  $('studentList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var id = b.getAttribute('data-sid');
+    if (b.getAttribute('data-act') === 'del') deleteStudent(id); else editStudent(id);
+  });
+
+  ['from', 'to', 'perFilter', 'regDate'].forEach(function (id) { $(id).addEventListener('change', renderReports); });
+  $('exportCsv').addEventListener('click', exportCsv);
+  $('printBtn').addEventListener('click', function () { window.print(); });
+
+  $('addFirstYear').addEventListener('click', function () {
+    var added = 0;
+    ['A', 'B'].forEach(function (L) {
+      for (var i = 1; i <= 10; i++) if (!hasSection(1, L + i)) { addSection(1, L + i); added++; }
+    });
+    if (!sectionId && db.sections.length) sectionId = db.sections[0].id;
+    save(); render(); toast(added ? 'Added ' + added + ' section(s)' : 'All 1st-year sections already exist');
+  });
+  $('addSection').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var year = +$('secYear').value, name = str($('secName').value, 40); if (!name) return;
+    if (hasSection(year, name)) { toast('That section already exists'); return; }
+    var s = addSection(year, name); if (!sectionId) sectionId = s.id;
+    $('secName').value = ''; save(); render();
+  });
+  $('sectionList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var id = b.getAttribute('data-id');
+    var s = db.sections.filter(function (x) { return x.id === id; })[0]; if (!s) return;
+    if (b.getAttribute('data-act') === 'rename') {
+      var n = prompt('Section name:', s.name); if (n === null) return;
+      n = str(n, 40); if (!n) { toast('Name cannot be empty'); return; }
+      if (n.toLowerCase() !== s.name.toLowerCase() && hasSection(s.year, n)) { toast('That section already exists'); return; }
+      s.name = n; db.sections.sort(cmpSection); save(); render();
+    } else {
+      if (!confirm('Delete ' + secLabel(s) + ' with ' + secCount(s) + ' student(s) and ALL its attendance records?')) return;
+      db.sections = db.sections.filter(function (x) { return x.id !== id; });
+      if (sectionId === id) sectionId = db.sections.length ? db.sections[0].id : null;
+      save(); render();
+    }
+  });
+  $('orgSave').addEventListener('click', function () {
+    api('POST', 'org', { name: $('orgName').value }).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not save')); return; }
+      cloud.org = res.body; $('title').textContent = res.body.name + ' \u00b7 Attendance'; toast('Saved');
+    }).catch(function () { toast('Cannot reach the server'); });
+  });
+  $('orgNew').addEventListener('click', function () {
+    if (!confirm('Make a new college code? The old code will stop working for new sign-ups. Existing teachers are not affected.')) return;
+    api('POST', 'org/code', {}).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not change code')); return; }
+      cloud.org = res.body; renderSettings(); toast('New code created');
+    }).catch(function () { toast('Cannot reach the server'); });
+  });
+  $('orgCopy').addEventListener('click', function () {
+    var code = (cloud.org && cloud.org.code) || '';
+    if (navigator.clipboard && code) navigator.clipboard.writeText(code).then(function () { toast('Code copied'); }, function () { toast('Copy it by hand: ' + code); });
+    else toast('Your code: ' + code);
+  });
+  $('backup').addEventListener('click', backup);
+  $('backupCloud').addEventListener('click', function () {
+    var btn = this; btn.disabled = true; toast('Preparing backup\u2026');
+    var out = { kind: 'college-attendance-backup', version: 3, exported: new Date().toISOString(), sections: [] };
+    var chain = Promise.resolve();
+    db.sections.forEach(function (m) {
+      chain = chain.then(function () {
+        return api('GET', 'sections/' + encodeURIComponent(m.id)).then(function (r) {
+          if (r.status === 401) throw new Error('Session expired. Please log in again.');
+          if (!r.ok) throw new Error('Could not read ' + secLabel(m));
+          out.sections.push(r.body.section);
+        });
+      });
+    });
+    chain.then(function () {
+      download('attendance-backup-' + todayStr() + '.json', JSON.stringify(out, null, 2), 'application/json');
+      toast('Backup downloaded (' + out.sections.length + ' sections)');
+    }).catch(function (e) { toast(e && e.message ? e.message : 'Backup failed'); })
+      .then(function () { btn.disabled = false; });
+  });
+  $('restoreBtn').addEventListener('click', function () { $('restoreFile').click(); });
+  $('restoreFile').addEventListener('change', function () { if (this.files && this.files[0]) restore(this.files[0]); this.value = ''; });
+  $('changePin').addEventListener('click', changePin);
+  $('deleteMe').addEventListener('click', deleteMe);
+
+  // cloud accounts
+  $('reqApproval').addEventListener('change', function () {
+    var box = this;
+    api('PUT', 'settings', { requireApproval: box.checked }).then(function (res) {
+      if (!res.ok) { box.checked = !box.checked; toast(errMsg(res, 'Could not change setting')); return; }
+      toast(box.checked ? 'New sign-ups now need your approval' : 'New sign-ups can log in immediately'); renderUsers();
+    }).catch(function () { box.checked = !box.checked; toast('Cannot reach the server'); });
+  });
+  $('addUser').addEventListener('submit', function (e) {
+    e.preventDefault();
+    api('POST', 'users', { username: $('uUser').value, name: $('uName').value, password: $('uPass').value, role: $('uRole').value }).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not add account')); return; }
+      $('uUser').value = ''; $('uName').value = ''; $('uPass').value = '';
+      toast('Account created. Share the temporary password privately.'); renderUsers();
+    }).catch(function () { toast('Cannot reach the server'); });
+  });
+  $('resetUser').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!$('rUser').value) return;
+    api('PUT', 'users/' + encodeURIComponent($('rUser').value), { password: $('rPass').value }).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not reset password')); return; }
+      $('rPass').value = ''; toast('Password reset. That user was logged out everywhere.');
+    }).catch(function () { toast('Cannot reach the server'); });
+  });
+  $('userList').addEventListener('click', function (e) {
+    var ap = e.target.closest('button[data-act="approve"]');
+    if (ap) {
+      api('PUT', 'users/' + encodeURIComponent(ap.getAttribute('data-id')), { approve: true }).then(function (res) {
+        if (!res.ok) { toast(errMsg(res, 'Could not approve')); return; }
+        toast('Approved. They can log in now.'); renderUsers();
+      }).catch(function () { toast('Cannot reach the server'); });
+      return;
+    }
+    var b = e.target.closest('button[data-act="deluser"]'); if (!b) return;
+    if (!confirm('Remove the account "' + b.getAttribute('data-name') + '"? Attendance data is kept.')) return;
+    api('DELETE', 'users/' + encodeURIComponent(b.getAttribute('data-id'))).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not delete account')); return; }
+      renderUsers();
+    }).catch(function () { toast('Cannot reach the server'); });
+  });
+  $('pwForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    api('POST', 'password', { current: $('pwCur').value, password: $('pwNew').value }).then(function (res) {
+      if (!res.ok) { toast(errMsg(res, 'Could not change password')); return; }
+      $('pwCur').value = ''; $('pwNew').value = ''; toast('Password changed');
+    }).catch(function () { toast('Cannot reach the server'); });
+  });
+
+  window.addEventListener('error', function () { toast('Something went wrong. Your saved data is untouched.'); });
+  window.addEventListener('unhandledrejection', function () { toast('Something went wrong. Your saved data is untouched.'); });
+
+  load().then(function () {
+    if (mode === 'cloud' && cloud.user) enter(cloud.user); else renderLogin();
+  }, function () { mode = 'offline'; renderLogin(); });
+})();
+</script>
+</body>
+</html>
+
+
+
